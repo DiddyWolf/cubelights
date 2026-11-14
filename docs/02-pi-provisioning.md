@@ -46,7 +46,7 @@ This script safely updates the FAT32 `bootfs` partition before first boot:
 3. On the Pi, run `setup_pi.sh` from `~/cubelights`:
    ```bash
    cd ~/cubelights
-   sudo ./pi/system/setup_pi.sh
+   sudo bash ./pi/system/setup_pi.sh
    ```
 
 What `setup_pi.sh` does automatically:
@@ -57,7 +57,7 @@ What `setup_pi.sh` does automatically:
 - **Bluetooth PAN & Services:** Configures `pan0` bridge (`10.55.0.1/24` via `cubelights-pan0.service` + DHCP-only `dnsmasq` with `port=0`), marks `pan0` unmanaged in NetworkManager (leaving `wlan0` undisturbed), and updates `/etc/bluetooth/main.conf`.
   - *(Avoid corporate `10.x.x.x` collisions)* You can override the `/24` subnet prefix at install time (for example, `172.31.250.0/24` or `192.168.254.0/24`):
     ```bash
-    sudo PAN_SUBNET_PREFIX=172.31.250 ./pi/system/setup_pi.sh
+    sudo PAN_SUBNET_PREFIX=172.31.250 bash ./pi/system/setup_pi.sh
     ```
     To change it **after** setup (run `sudo cubelights-rw && sudo reboot` first if OverlayFS is already enabled):
     1. Edit `/etc/systemd/system/cubelights-pan0.service` (`172.31.250.1/24`)
