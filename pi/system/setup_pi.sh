@@ -16,7 +16,7 @@ DATA_SIZE_MIB="${DATA_SIZE_MIB:-512}"
 
 echo "[1/8] Checking storage partitions (rootfs=${ROOT_SIZE_MIB} MiB, /data=${DATA_SIZE_MIB} MiB)..."
 setup_storage_partitions() {
-  local root_src disk_name disk_dev p2_start p2_cur p3_start target_p2_sec target_p3_sec disk_sec p3_dev
+  local root_src disk_name disk_dev p2_start p2_cur p3_start target_p2_sec target_p3_sec disk_sec p3_dev p3_fs p3_label
   root_src="$(findmnt -n -o SOURCE /)"
   disk_name="$(lsblk -no PKNAME "${root_src}" | head -n1)"
   if [[ -z "${disk_name}" ]]; then
@@ -62,16 +62,28 @@ setup_storage_partitions() {
   fi
 
   if [[ -b "${p3_dev}" ]]; then
-    if ! blkid "${p3_dev}" >/dev/null 2>&1; then
+    p3_fs="$(blkid -o value -s TYPE "${p3_dev}" 2>/dev/null || true)"
+    if [[ -z "${p3_fs}" ]]; then
       echo "  Formatting ${p3_dev} as ext4 (LABEL=cubelights-data)..."
       mkfs.ext4 -F -L cubelights-data "${p3_dev}"
+      udevadm trigger "${p3_dev}" >/dev/null 2>&1 || true
+      udevadm settle >/dev/null 2>&1 || sleep 1
+    else
+      p3_label="$(blkid -o value -s LABEL "${p3_dev}" 2>/dev/null || true)"
+      if [[ "${p3_fs}" == ext* && "${p3_label}" != "cubelights-data" ]]; then
+        echo "  Labeling ${p3_dev} as cubelights-data..."
+        e2label "${p3_dev}" cubelights-data
+        udevadm trigger "${p3_dev}" >/dev/null 2>&1 || true
+        udevadm settle >/dev/null 2>&1 || sleep 1
+      fi
     fi
     mkdir -p /data
     if ! grep -q '^LABEL=cubelights-data[[:space:]]\+/data[[:space:]]' /etc/fstab; then
       echo 'LABEL=cubelights-data /data ext4 ro,noatime,nofail 0 2' >> /etc/fstab
     fi
     if ! mountpoint -q /data; then
-      mount /data
+      systemctl daemon-reload >/dev/null 2>&1 || true
+      mount /data || mount "${p3_dev}" /data
     fi
     mount -o remount,rw /data
   fi

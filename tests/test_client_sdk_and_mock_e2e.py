@@ -101,3 +101,30 @@ def test_sdk_and_webui_end_to_end(tmp_path):
     finally:
         engine.stop()
         server.stop()
+
+
+def test_windows_hook_runner_no_ctypes_overflow_on_win32():
+    import sys
+
+    if sys.platform != "win32":
+        return
+
+    from cubelights_client.windows_hooks import WindowsHookRunner
+
+    unraisable: list[BaseException] = []
+    prev_hook = sys.unraisablehook
+    sys.unraisablehook = lambda args: unraisable.append(args.exc_value)
+    runner = WindowsHookRunner(
+        on_lock=lambda: None,
+        on_unlock=lambda: None,
+        hotkey="Ctrl+Alt+B",
+        on_hotkey=lambda: None,
+    )
+    try:
+        assert runner.start() is True
+        time.sleep(0.25)
+    finally:
+        runner.stop()
+        sys.unraisablehook = prev_hook
+
+    assert unraisable == []

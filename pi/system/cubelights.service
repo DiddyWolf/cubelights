@@ -1,6 +1,6 @@
 [Unit]
 Description=Cubelights LED Controller & Bluetooth Daemon
-After=bluetooth.target cubelights-pan0.service local-fs.target
+After=bluetooth.target cubelights-pan0.service local-fs.target data.mount
 Wants=bluetooth.target cubelights-pan0.service
 
 [Service]

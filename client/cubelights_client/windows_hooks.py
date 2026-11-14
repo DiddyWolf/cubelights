@@ -78,8 +78,17 @@ class WindowsHookRunner:
         if sys.platform == "win32" and self._thread_id is not None:
             try:
                 import ctypes
+                from ctypes import wintypes
 
-                ctypes.windll.user32.PostThreadMessageW(self._thread_id, _WM_QUIT, 0, 0)
+                user32 = ctypes.WinDLL("user32")
+                user32.PostThreadMessageW.argtypes = [
+                    wintypes.DWORD,
+                    wintypes.UINT,
+                    wintypes.WPARAM,
+                    wintypes.LPARAM,
+                ]
+                user32.PostThreadMessageW.restype = wintypes.BOOL
+                user32.PostThreadMessageW(self._thread_id, _WM_QUIT, 0, 0)
             except Exception:
                 pass
         if self._thread is not None:
@@ -89,17 +98,65 @@ class WindowsHookRunner:
         import ctypes
         from ctypes import wintypes
 
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        wtsapi32 = ctypes.windll.wtsapi32
+        # Use private WinDLL instances with explicit 64-bit-safe argtypes/restypes
+        # so HWND/WPARAM/LPARAM pointers don't overflow 32-bit c_int defaults or collide with pystray.
+        user32 = ctypes.WinDLL("user32")
+        kernel32 = ctypes.WinDLL("kernel32")
+        wtsapi32 = ctypes.WinDLL("wtsapi32")
+
+        lresult_t = getattr(wintypes, "LRESULT", ctypes.c_ssize_t)
 
         WNDPROC = ctypes.WINFUNCTYPE(
-            ctypes.c_ssize_t,
+            lresult_t,
             wintypes.HWND,
             wintypes.UINT,
             wintypes.WPARAM,
             wintypes.LPARAM,
         )
+
+        user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.DefWindowProcW.restype = lresult_t
+        user32.RegisterClassW.argtypes = [ctypes.c_void_p]
+        user32.RegisterClassW.restype = wintypes.ATOM
+        user32.UnregisterClassW.argtypes = [wintypes.LPCWSTR, wintypes.HINSTANCE]
+        user32.UnregisterClassW.restype = wintypes.BOOL
+        user32.CreateWindowExW.argtypes = [
+            wintypes.DWORD,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.HWND,
+            wintypes.HMENU,
+            wintypes.HINSTANCE,
+            wintypes.LPVOID,
+        ]
+        user32.CreateWindowExW.restype = wintypes.HWND
+        user32.DestroyWindow.argtypes = [wintypes.HWND]
+        user32.DestroyWindow.restype = wintypes.BOOL
+        user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+        user32.RegisterHotKey.restype = wintypes.BOOL
+        user32.UnregisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.UnregisterHotKey.restype = wintypes.BOOL
+        user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+        user32.GetMessageW.restype = wintypes.BOOL
+        user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
+        user32.TranslateMessage.restype = wintypes.BOOL
+        user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
+        user32.DispatchMessageW.restype = lresult_t
+
+        kernel32.GetCurrentThreadId.argtypes = []
+        kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+        kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+        kernel32.GetModuleHandleW.restype = wintypes.HMODULE
+
+        wtsapi32.WTSRegisterSessionNotification.argtypes = [wintypes.HWND, wintypes.DWORD]
+        wtsapi32.WTSRegisterSessionNotification.restype = wintypes.BOOL
+        wtsapi32.WTSUnRegisterSessionNotification.argtypes = [wintypes.HWND]
+        wtsapi32.WTSUnRegisterSessionNotification.restype = wintypes.BOOL
 
         class WNDCLASSW(ctypes.Structure):
             _fields_ = [
