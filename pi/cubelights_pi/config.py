@@ -50,7 +50,7 @@ class DeviceConfig:
     max_brightness_cap: float = 0.75
     fps: float = 45.0
     stream_timeout_s: float = 5.0
-    shim_led_brightness: float = 0.22
+    shim_led_brightness: float = 0.11
     segments: list[SegmentSpec] = field(default_factory=lambda: default_segment_map().segments)
     button_bindings: dict[str, str] = field(default_factory=default_button_bindings)
     mode_cycle: list[dict[str, Any]] = field(default_factory=default_mode_cycle)
@@ -107,7 +107,7 @@ class DeviceConfig:
             max_brightness_cap=float(data.get("max_brightness_cap", 0.75)),
             fps=float(data.get("fps", 45.0)),
             stream_timeout_s=float(data.get("stream_timeout_s", 5.0)),
-            shim_led_brightness=float(data.get("shim_led_brightness", 0.22)),
+            shim_led_brightness=float(data.get("shim_led_brightness", 0.11)),
             segments=segments,
             button_bindings=bindings,
             mode_cycle=list(mode_cycle),
