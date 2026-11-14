@@ -15,7 +15,7 @@ Perform these steps on your **personal computer at home** where the Pi can reach
 5. Write the image to your microSD card (8 GB or larger recommended).
 
 ## Step 2: Prepare `bootfs` on Windows Before First Boot
-Right after Raspberry Pi Imager finishes (re-insert the SD card reader if Windows auto-ejected it), run [prepare_bootfs.ps1](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/system/prepare_bootfs.ps1) in PowerShell on your Windows PC:
+Right after Raspberry Pi Imager finishes (re-insert the SD card reader if Windows auto-ejected it), run [prepare_bootfs.ps1](../pi/system/prepare_bootfs.ps1) in PowerShell on your Windows PC:
 
 ```powershell
 .\pi\system\prepare_bootfs.ps1
@@ -29,9 +29,11 @@ This script safely updates the FAT32 `bootfs` partition before first boot:
 
 ## Step 3: Boot, Copy Repo, and Run `setup_pi.sh`
 1. Insert the SD card into the Pi Zero W, power on, and wait 2–4 minutes for first-boot `cloud-init` + Wi-Fi setup.
-2. Stream the clean repo from your Windows PC to the Pi over SSH:
+2. From the repo root directory on your Windows PC, bundle `main` and copy it to the Pi over SSH (writing a bundle file avoids Windows PowerShell 5.1 corrupting binary piped streams; replace `cubelights.local` with the Pi's IP if mDNS does not resolve):
    ```powershell
-   git -C c:\Users\DiddyWolf\Projects\cubelights archive --format=tar main | ssh pi@cubelights.local "mkdir -p ~/cubelights && tar -xf - -C ~/cubelights"
+   git bundle create $env:TEMP\cubelights.bundle main
+   scp $env:TEMP\cubelights.bundle pi@cubelights.local:~/
+   ssh pi@cubelights.local "rm -rf ~/cubelights && git clone ~/cubelights.bundle ~/cubelights && rm ~/cubelights.bundle"
    ```
 3. SSH into the Pi (`ssh pi@cubelights.local`) and run `setup_pi.sh`:
    ```bash
@@ -92,11 +94,11 @@ You should see:
 If Red and Blue are swapped, set `"color_order": "RGB"` (or run `cubelights color-order RGB`).
 
 ## Step 5: Pair Windows 11 Laptop & Enable OverlayFS
-1. Follow [docs/03-bluetooth-and-windows.md](file:///c:/Users/DiddyWolf/Projects/cubelights/docs/03-bluetooth-and-windows.md) to pair your Windows 11 work laptop **before** locking OverlayFS (Bluetooth pairing keys live under `/var/lib/bluetooth/` on `/`, so pairing must persist on disk before OverlayFS is enabled!).
+1. Follow [docs/03-bluetooth-and-windows.md](03-bluetooth-and-windows.md) to pair your Windows 11 work laptop **before** locking OverlayFS (Bluetooth pairing keys live under `/var/lib/bluetooth/` on `/`, so pairing must persist on disk before OverlayFS is enabled!).
 2. Once paired and tested (with home Wi-Fi disabled to simulate the cubicle), lock down the root filesystem:
    ```bash
    sudo cubelights-enable-ro
    sudo reboot
    ```
 3. Verify OverlayFS is active (`mount | grep overlay` should show `overlay on /`).
-4. Capture a golden SD card backup image following [docs/04-maintenance-and-backups.md](file:///c:/Users/DiddyWolf/Projects/cubelights/docs/04-maintenance-and-backups.md).
+4. Capture a golden SD card backup image following [docs/04-maintenance-and-backups.md](04-maintenance-and-backups.md).

@@ -40,7 +40,7 @@ Both **TCP (`7777`)** and **Bluetooth RFCOMM Channel 2** share the same dual-fra
 ---
 
 ## Writing Declarative Keyframe Patterns (`.json`)
-Declarative patterns run completely autonomously on the Pi after upload (see [patterns/aurora_cascade.json](file:///c:/Users/DiddyWolf/Projects/cubelights/patterns/aurora_cascade.json)):
+Declarative patterns run completely autonomously on the Pi after upload (see [patterns/aurora_cascade.json](../patterns/aurora_cascade.json)):
 
 ```json
 {
@@ -78,7 +78,7 @@ cubelights upload my_custom_fade.json
 ---
 
 ## Writing Custom Python Shaders (`/data/shaders/*.py`)
-Drop any `.py` file into `/data/shaders/` (see [docs/04-maintenance-and-backups.md](file:///c:/Users/DiddyWolf/Projects/cubelights/docs/04-maintenance-and-backups.md) for remounting `/data` `rw`) and restart `cubelights`:
+Drop any `.py` file into `/data/shaders/` (see [docs/04-maintenance-and-backups.md](04-maintenance-and-backups.md) for remounting `/data` `rw`) and restart `cubelights`:
 
 ```python
 # /data/shaders/matrix_rain.py

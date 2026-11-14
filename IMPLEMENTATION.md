@@ -72,7 +72,7 @@ Based on the series-wired strips (6-LED, 13-LED, and 10-LED segments connected b
 
 ## Proposed Changes
 
-We will structure the repository at `c:\Users\DiddyWolf\Projects\cubelights` as a clean monorepo with three installable/deployable components plus Pi provisioning scripts:
+We will structure the repository (`cubelights/`) as a clean monorepo with three installable/deployable components plus Pi provisioning scripts:
 
 ```text
 cubelights/
@@ -89,7 +89,7 @@ cubelights/
 
 Pure-Python package (`cubelights_shared`) used identically by both the Pi daemon and the Windows 11 client. Zero external dependencies so it installs cleanly on ARMv6 Pi Zero W and Windows 11.
 
-#### [NEW] [protocol.py](file:///c:/Users/DiddyWolf/Projects/cubelights/shared/cubelights_shared/protocol.py)
+#### [NEW] [protocol.py](shared/cubelights_shared/protocol.py)
 Transport-agnostic dual-framing codec supporting mixed control commands and high-FPS live frames on a single stream (TCP or RFCOMM):
 - **JSON-line commands** (starts with `{`, terminated by `\n`):
   - `hello` / `status` (capabilities, active mode, brightness, power, uptime, Pi time)
@@ -104,7 +104,7 @@ Transport-agnostic dual-framing codec supporting mixed control commands and high
   - Header: `0x01` (1B) | `flags` (1B: e.g., hold/timeout behavior) | `brightness` (1B: `0..255`) | `payload_len` (2B uint16)
   - Payload: `29 * 3 = 87` bytes RGB (total **92 bytes/frame**, effortlessly supporting 60 FPS over both PAN and RFCOMM).
 
-#### [NEW] [patterns.py](file:///c:/Users/DiddyWolf/Projects/cubelights/shared/cubelights_shared/patterns.py)
+#### [NEW] [patterns.py](shared/cubelights_shared/patterns.py)
 - Declarative keyframe animation schema & validator (Pydantic-free pure Python dataclasses):
   - Supports **keyframes** (`duration_ms`, `easing`: `linear` | `ease_in_out` | `step`, `targets` by LED index, range, or named zone) and `loop` count (`0` = infinite).
   - Supports **palette cycles** (list of RGB stops + flow speed + spatial scale).
@@ -114,12 +114,12 @@ Transport-agnostic dual-framing codec supporting mixed control commands and high
 
 ### 2. Pi Hardware Drivers & Layered LED Engine (`pi/`)
 
-#### [NEW] [apa102.py](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/cubelights_pi/drivers/apa102.py)
+#### [NEW] [apa102.py](pi/cubelights_pi/drivers/apa102.py)
 - Pure Python `spidev` driver for APA102/SK9822 (`/dev/spidev0.0`, configurable SPI frequency default `4 MHz`, configurable color order default `BGR`).
 - Combines 8-bit RGB channels with APA102's 5-bit hardware global brightness (`0xE0 | level`) to keep color fidelity high even at dim desk brightness levels, plus enforces the configured `max_brightness_cap` (default `0.75`).
 - Includes a `MockStripDriver` for unit tests and local simulation.
 
-#### [NEW] [button_shim.py](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/cubelights_pi/drivers/button_shim.py)
+#### [NEW] [button_shim.py](pi/cubelights_pi/drivers/button_shim.py)
 - Clean, thread-safe driver for the Pimoroni Button SHIM over `/dev/i2c-1` (`0x3F`, TCA9554A I/O expander + bit-banged APA102 status LED) using `smbus2` (avoids legacy `buttonshim` / `RPi.GPIO` Bookworm packaging friction).
 - Supports **short press**, **long press** (e.g., 2s for `E`), and **chord press** (`A+E` held 3s for safe `poweroff`).
 - Default configurable bindings (`buttons.json` on `/data`):
@@ -132,7 +132,7 @@ Transport-agnostic dual-framing codec supporting mixed control commands and high
   - `A+E` (long 3s): Safe shutdown (SHIM LED flashes amber/red, syncs `/data`, invokes `systemctl poweroff`)
 - SHIM RGB LED status semantics: subtle current-mode tint when active, dim red dot when Busy, pulsing blue during BT pairing, brief white/green blink on BT connect or button ack.
 
-#### [NEW] [engine.py](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/cubelights_pi/engine.py)
+#### [NEW] [engine.py](pi/cubelights_pi/engine.py)
 - 45–60 FPS render loop with priority layers:
   1. **Stream layer** (live binary frames from laptop; auto-expires after configurable timeout e.g. `5s` if laptop sleeps/disconnects, reverting smoothly to the underlying autonomous mode).
   2. **Static Direct layer** (individual LED/zone values set statically).
@@ -141,7 +141,7 @@ Transport-agnostic dual-framing codec supporting mixed control commands and high
      - Built-in shaders: `rainbow`, `pulse` (sine/breathing), `wave` (multi-tone oceanic blue waves), `seasonal` (presets: `spring`, `summer`, `fall`, `halloween`, `winter`, `holiday`, plus optional `auto` based on laptop-synced date), `warm_desk`, `sparkle`, `chase`, `gradient`, `solid`.
      - Declarative `KeyframePlayer` running uploaded `/data/patterns/*.json` animations.
 
-#### [NEW] [storage.py](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/cubelights_pi/storage.py)
+#### [NEW] [storage.py](pi/cubelights_pi/storage.py)
 - Manages `/data` persistence safely under read-only OverlayFS environments:
   - Debounces state changes (`3s` quiet window) before saving `state.json`.
   - Mounts `/data` `rw` -> writes temp file -> `fsync()` -> `os.replace()` -> remounts `/data` `ro` (gracefully falls back to standard directory writes when running in dev/test mode).
@@ -150,14 +150,14 @@ Transport-agnostic dual-framing codec supporting mixed control commands and high
 
 ### 3. Bluetooth Subsystem & Pi Provisioning (`pi/system/`)
 
-#### [NEW] [bt_manager.py](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/cubelights_pi/bt_manager.py)
+#### [NEW] [bt_manager.py](pi/cubelights_pi/bt_manager.py)
 Runs alongside or inside `cubelights-daemon` via BlueZ D-Bus (`dbus-next` or `dasbus` / `python3-dbus`):
 - **Security**: Sets adapter `Discoverable=False`, `Pairable=False` at startup. On `enter_pairing_mode(120s)`, temporarily enables `Discoverable=True`, `Pairable=True`, registers a `NoInputNoOutput` pairing agent, and marks newly paired devices `Trusted=True`.
 - **PAN (NAP)**: Registers BlueZ `NetworkServer1` (`"nap"` -> `pan0` bridge), backed by `systemd-networkd` (`10.55.0.1/24`) and `dnsmasq` DHCP (`10.55.0.10–10.55.0.50`).
 - **RFCOMM Channel 1 (Maintenance Console)**: Registers BlueZ SPP (`00001101-0000-1000-8000-00805f9b34fb`) on channel 1; on client connect, allocates a PTY and runs `/sbin/agetty` (standard Linux username/password login).
 - **RFCOMM Channel 2 (LED Control)**: Registers custom SPP UUID (`e3b0c442-1a2b-4c3d-9e4f-100000000001`) on channel 2, feeding incoming client sockets directly into the `cubelights-daemon` protocol handler (same handler as TCP port `7777` & UDP port `7778`).
 
-#### [NEW] [setup_pi.sh](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/system/setup_pi.sh)
+#### [NEW] [setup_pi.sh](pi/system/setup_pi.sh)
 Idempotent provisioning script run via SSH on the fresh **Raspberry Pi OS Lite (32-bit Bookworm)** install:
 1. Installs apt dependencies (`python3-venv`, `python3-dbus`, `python3-gi`, `python3-spidev`, `python3-smbus`, `bluez`, `dnsmasq`, `util-linux`).
 2. Enables SPI and I2C in `/boot/firmware/config.txt` (`dtparam=spi=on`, `dtparam=i2c_arm=on`).
@@ -170,20 +170,20 @@ Idempotent provisioning script run via SSH on the fresh **Raspberry Pi OS Lite (
 
 ### 4. Windows 11 Client SDK, CLI, Tray & Web UI (`client/`)
 
-#### [NEW] [transport.py](file:///c:/Users/DiddyWolf/Projects/cubelights/client/cubelights_client/transport.py)
+#### [NEW] [transport.py](client/cubelights_client/transport.py)
 - Smart auto-transport client:
   1. Checks TCP `10.55.0.1:7777` (PAN) with a fast `400ms` connect timeout (and UDP `7778` for frame streaming).
   2. If PAN isn't connected or blocked by corporate VPN, automatically connects via **Classic Bluetooth RFCOMM** to the paired Pi's MAC address on Channel 2 using Python's built-in `socket.AF_BLUETOOTH` (`BTPROTO_RFCOMM`) — or optional Windows `COMx` port via `pyserial`.
   3. Automatically sends `sync_time` on every new connection.
 
-#### [NEW] [sdk.py](file:///c:/Users/DiddyWolf/Projects/cubelights/client/cubelights_client/sdk.py)
+#### [NEW] [sdk.py](client/cubelights_client/sdk.py)
 - Clean `CubeLightsClient` (sync + async) API:
   - `set_mode(name, **params)`, `set_busy(bool)`, `set_power(bool)`, `set_brightness(float)`
   - `set_leds(colors)` (static per-LED or zone control)
   - `stream_frame(rgb_bytes)` / `FrameStreamer(fps=45)` context manager for custom animated scripts
   - `upload_pattern(pattern)` / `list_patterns()` / `delete_pattern(name)`
 
-#### [NEW] [cli.py](file:///c:/Users/DiddyWolf/Projects/cubelights/client/cubelights_client/cli.py)
+#### [NEW] [cli.py](client/cubelights_client/cli.py)
 - `cubelights` CLI commands:
   - `cubelights discover` (finds paired Pi MAC / PAN IP)
   - `cubelights status` / `cubelights calibrate` (walks R, G, B and segment 1, 2, 3 to verify color order & orientation)
@@ -192,7 +192,7 @@ Idempotent provisioning script run via SSH on the fresh **Raspberry Pi OS Lite (
   - `cubelights upload patterns/holiday.json`
   - `cubelights tray` / `cubelights ui`
 
-#### [NEW] [tray_and_web.py](file:///c:/Users/DiddyWolf/Projects/cubelights/client/cubelights_client/tray_and_web.py) & [index.html](file:///c:/Users/DiddyWolf/Projects/cubelights/client/cubelights_client/web/index.html)
+#### [NEW] [tray_and_web.py](client/cubelights_client/tray_and_web.py) & [index.html](client/cubelights_client/web/index.html)
 - **System Tray** (`pystray` + `Pillow`):
   - Quick menu: **Toggle Busy/On-Call**, **Modes** submenu, **Brightness** presets, **Power Off**, **Open Control Panel**.
   - Optional Windows hooks: global hotkey (e.g., `Ctrl+Alt+B` for Busy toggle) and Windows session lock/unlock listener (`WTSRegisterSessionNotification` via `ctypes`) to turn off/dim LEDs when you lock your work laptop and step away!

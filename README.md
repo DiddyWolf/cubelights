@@ -64,4 +64,4 @@ You can also run the Pi daemon locally in mock-hardware mode and test the Web UI
 .\.venv\Scripts\cubelights.exe --host 127.0.0.1 mode seasonal --params '{\"theme\":\"halloween\"}'
 ```
 
-For full Pi hardware assembly, provisioning, Bluetooth setup, maintenance, and SD card backup instructions, follow the numbered guides in [docs/](file:///c:/Users/DiddyWolf/Projects/cubelights/docs/01-hardware-assembly.md).
+For full Pi hardware assembly, provisioning, Bluetooth setup, maintenance, and SD card backup instructions, follow the numbered guides in [docs/](docs/01-hardware-assembly.md).

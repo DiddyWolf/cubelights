@@ -12,7 +12,7 @@ This guide covers hardware bring-up verification, serial/network diagnostics, Bl
 
 ### Adafruit PiUART Console (`COMx` on Windows)
 - **Settings:** `115200` baud, 8 data bits, 1 stop bit, No parity, Flow control **None**. Press `Enter` if the Pi already finished booting before the terminal opened.
-- **Required `bootfs` settings** (automated by [prepare_bootfs.ps1](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/system/prepare_bootfs.ps1)):
+- **Required `bootfs` settings** (automated by [prepare_bootfs.ps1](../pi/system/prepare_bootfs.ps1)):
   - `cmdline.txt` (one single line): contains `console=serial0,115200`
   - `config.txt`: `enable_uart=1` placed under a trailing `[all]` section (never under `[pi5]` / `[cm5]`)
 - **GPIO check:** Confirm PiUART pins align squarely on physical pins 1–10 (GND, GPIO 14 TXD -> PiUART RX, GPIO 15 RXD -> PiUART TX). Avoid feeding 5V simultaneously from both PiUART and PiPixel if powered externally.
@@ -117,4 +117,4 @@ Simulate your work cubicle by disabling home Wi-Fi temporarily on the Pi (`sudo 
    ```
 3. Switch modes / upload a pattern via `cubelights`, wait 5 seconds for the debounced `/data` save, then **unplug power without shutting down**.
 4. Plug power back in and verify the Pi boots cleanly with your last saved mode and `/data/patterns/` intact.
-5. Once verified, capture your golden SD card backup image following [docs/04-maintenance-and-backups.md](file:///c:/Users/DiddyWolf/Projects/cubelights/docs/04-maintenance-and-backups.md).
+5. Once verified, capture your golden SD card backup image following [docs/04-maintenance-and-backups.md](04-maintenance-and-backups.md).
