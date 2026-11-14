@@ -144,6 +144,7 @@ systemctl reload NetworkManager || true
 systemctl enable dnsmasq
 systemctl restart dnsmasq || true
 systemctl enable bluetooth
+rfkill unblock bluetooth || /usr/sbin/rfkill unblock bluetooth || true
 systemctl restart bluetooth || true
 
 echo "[8/8] Installing systemd service and maintenance helper scripts..."

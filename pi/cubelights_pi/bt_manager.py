@@ -8,6 +8,7 @@ import select
 import signal
 import subprocess
 import threading
+import time
 from typing import Callable
 
 from cubelights_shared.protocol import (
@@ -65,6 +66,28 @@ def _bridge_rfcomm_pty(rfcomm_fd: int) -> None:
                 pass
 
 
+def _unblock_bluetooth_rfkill() -> None:
+    """Clear any soft rfkill block on Bluetooth so BlueZ can power on hci0."""
+    for cmd in ("rfkill", "/usr/sbin/rfkill"):
+        try:
+            res = subprocess.run(
+                [cmd, "unblock", "bluetooth"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5.0,
+            )
+            if res.returncode == 0:
+                return
+            logger.debug("%s unblock bluetooth returned %d: %s", cmd, res.returncode, res.stderr.strip())
+            return
+        except FileNotFoundError:
+            continue
+        except Exception as exc:
+            logger.debug("rfkill unblock bluetooth failed: %s", exc)
+            return
+
+
 class BluetoothManager:
     """Coordinates BlueZ PAN NAP, dual RFCOMM SPP profiles, and timed pairing."""
 
@@ -72,10 +95,12 @@ class BluetoothManager:
         self,
         on_control_fd: Callable[[int, str], None],
         on_pairing_state: Callable[[bool, float], None] | None = None,
+        on_connection_state: Callable[[bool, bool], None] | None = None,
         pan_bridge: str = "pan0",
     ) -> None:
         self.on_control_fd = on_control_fd
         self.on_pairing_state = on_pairing_state
+        self.on_connection_state = on_connection_state
         self.pan_bridge = pan_bridge
 
         self._thread: threading.Thread | None = None
@@ -84,6 +109,8 @@ class BluetoothManager:
         self._adapter_props = None
         self._pairing_timer: threading.Timer | None = None
         self._available = False
+        self._conn_lock = threading.Lock()
+        self._connected_devices: set[str] = set()
 
     def start(self) -> bool:
         """Initialize BlueZ D-Bus registrations on a background GLib main loop."""
@@ -100,14 +127,25 @@ class BluetoothManager:
         self._bus = dbus.SystemBus()
         self._loop = GLib.MainLoop()
 
-        adapter_path = self._find_adapter_path(dbus)
+        _unblock_bluetooth_rfkill()
+
+        adapter_path, connected_devices = self._scan_bluez_objects(dbus)
         if adapter_path is None:
             logger.warning("No Bluetooth HCI adapter found on D-Bus.")
+            self._notify_connection_state()
             return False
+
+        with self._conn_lock:
+            self._connected_devices = connected_devices
 
         adapter_obj = self._bus.get_object("org.bluez", adapter_path)
         self._adapter_props = dbus.Interface(adapter_obj, "org.freedesktop.DBus.Properties")
-        self._adapter_props.Set("org.bluez.Adapter1", "Powered", dbus.Boolean(True))
+        try:
+            self._adapter_props.Set("org.bluez.Adapter1", "Powered", dbus.Boolean(True))
+        except Exception:
+            _unblock_bluetooth_rfkill()
+            time.sleep(0.3)
+            self._adapter_props.Set("org.bluez.Adapter1", "Powered", dbus.Boolean(True))
         self._adapter_props.Set("org.bluez.Adapter1", "Discoverable", dbus.Boolean(False))
         self._adapter_props.Set("org.bluez.Adapter1", "Pairable", dbus.Boolean(False))
 
@@ -119,25 +157,89 @@ class BluetoothManager:
         except Exception as exc:
             logger.warning("Could not register PAN NAP (%s): %s", self.pan_bridge, exc)
 
-        # 2. Register pairing agent + RFCOMM profiles
+        # 2. Register pairing agent + RFCOMM profiles + connection watchers
         self._register_agent(dbus)
         self._register_rfcomm_profiles(dbus)
+        self._register_connection_signals()
 
         self._available = True
+        self._notify_connection_state()
         self._thread = threading.Thread(target=self._loop.run, name="bluez-glib", daemon=True)
         self._thread.start()
         return True
 
-    def _find_adapter_path(self, dbus) -> str | None:
+    def _scan_bluez_objects(self, dbus) -> tuple[str | None, set[str]]:
         mgr = dbus.Interface(
             self._bus.get_object("org.bluez", "/"),
             "org.freedesktop.DBus.ObjectManager",
         )
         objects = mgr.GetManagedObjects()
+        adapter_path: str | None = None
+        connected_devices: set[str] = set()
         for path, ifaces in objects.items():
-            if "org.bluez.Adapter1" in ifaces:
-                return str(path)
-        return None
+            if adapter_path is None and "org.bluez.Adapter1" in ifaces:
+                adapter_path = str(path)
+            dev_props = ifaces.get("org.bluez.Device1")
+            if dev_props is not None and bool(dev_props.get("Connected", False)):
+                connected_devices.add(str(path))
+        return adapter_path, connected_devices
+
+    def _notify_connection_state(self) -> None:
+        if self.on_connection_state is None:
+            return
+        with self._conn_lock:
+            ready = self._available
+            connected = ready and bool(self._connected_devices)
+        self.on_connection_state(ready, connected)
+
+    def _register_connection_signals(self) -> None:
+        if self._bus is None:
+            return
+        self._bus.add_signal_receiver(
+            self._on_device_properties_changed,
+            dbus_interface="org.freedesktop.DBus.Properties",
+            signal_name="PropertiesChanged",
+            arg0="org.bluez.Device1",
+            path_keyword="path",
+        )
+        self._bus.add_signal_receiver(
+            self._on_interfaces_added,
+            dbus_interface="org.freedesktop.DBus.ObjectManager",
+            signal_name="InterfacesAdded",
+        )
+        self._bus.add_signal_receiver(
+            self._on_interfaces_removed,
+            dbus_interface="org.freedesktop.DBus.ObjectManager",
+            signal_name="InterfacesRemoved",
+        )
+
+    def _on_device_properties_changed(self, _iface, changed, _invalidated, path: str = "") -> None:
+        if "Connected" not in changed:
+            return
+        dev_path = str(path)
+        is_conn = bool(changed["Connected"])
+        with self._conn_lock:
+            if is_conn:
+                self._connected_devices.add(dev_path)
+            else:
+                self._connected_devices.discard(dev_path)
+        logger.info("Bluetooth device %s %s", dev_path, "connected" if is_conn else "disconnected")
+        self._notify_connection_state()
+
+    def _on_interfaces_added(self, object_path, interfaces) -> None:
+        dev_props = interfaces.get("org.bluez.Device1")
+        if dev_props is None or not bool(dev_props.get("Connected", False)):
+            return
+        with self._conn_lock:
+            self._connected_devices.add(str(object_path))
+        self._notify_connection_state()
+
+    def _on_interfaces_removed(self, object_path, interfaces) -> None:
+        if "org.bluez.Device1" not in interfaces:
+            return
+        with self._conn_lock:
+            self._connected_devices.discard(str(object_path))
+        self._notify_connection_state()
 
     def _register_agent(self, dbus) -> None:
         import dbus.service  # type: ignore[import-not-found]
@@ -292,6 +394,10 @@ class BluetoothManager:
         logger.info("Exited Bluetooth pairing mode")
 
     def stop(self) -> None:
+        self._available = False
+        with self._conn_lock:
+            self._connected_devices.clear()
+        self._notify_connection_state()
         if self._pairing_timer is not None:
             self._pairing_timer.cancel()
         if self._loop is not None:

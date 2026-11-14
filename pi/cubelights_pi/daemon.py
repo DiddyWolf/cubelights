@@ -131,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         bt_mgr = BluetoothManager(
             on_control_fd=server.handle_raw_fd,
             on_pairing_state=lambda active, dur: engine.set_pairing_indicator(active, dur),
+            on_connection_state=engine.set_bluetooth_status,
         )
 
     shim.register_callback(_bind_button_actions(engine, storage, bt_mgr))
@@ -145,10 +146,13 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, _on_signal)
 
     server.start()
-    if bt_mgr is not None:
-        bt_mgr.start()
     shim.start()
     engine.start()
+    if bt_mgr is not None:
+        try:
+            bt_mgr.start()
+        except Exception:
+            logger.exception("Bluetooth manager failed to start; continuing without Bluetooth.")
 
     try:
         while not stop_evt.is_set():

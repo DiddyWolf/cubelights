@@ -57,11 +57,12 @@ Run these checks on the Pi over SSH or PiUART:
    ```
 4. **Button SHIM physical test:**
    - `A` / `D`: Cycle modes (`rainbow`, `wave`, `seasonal`, `warm_desk`, `sparkle`, `chase`)
-   - `B`: Toggle Busy / On-Call pulsing red (SHIM LED turns red)
+   - `B`: Toggle Busy / On-Call pulsing red
    - `C`: Cycle brightness steps
    - `E` (short): Toggle LEDs Off/On
-   - `E` (hold ~2s): SHIM LED pulses blue (120s Bluetooth pairing mode)
+   - `E` (hold ~2s): SHIM LED flashes alternating blue/red (120s Bluetooth pairing mode)
    - `A + E` (hold ~3s): Flashes amber/red and triggers safe `systemctl poweroff`
+   - **SHIM status LED**: 3 green blinks when booted & ready -> slow-breathing blue when waiting for Bluetooth, solid blue when connected over Bluetooth, or dim amber if Bluetooth is unavailable.
 5. **LED calibration (color order & 6 / 13 / 10 direction):**
    ```bash
    /opt/cubelights/venv/bin/python -c "

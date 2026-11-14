@@ -45,6 +45,7 @@ class LedEngine:
         )
 
         self._start_mono = time.monotonic()
+        self._boot_start_mono = self._start_mono
         self._pattern_start_mono = self._start_mono
         self._time_offset_s = 0.0  # wall_epoch - monotonic
 
@@ -56,6 +57,8 @@ class LedEngine:
         self._calibrate_start: float = 0.0
 
         self._pairing_until: float = 0.0
+        self._bt_ready: bool = False
+        self._bt_connected: bool = False
         self._flash_color: RGB | None = None
         self._flash_until: float = 0.0
 
@@ -106,6 +109,11 @@ class LedEngine:
     def set_pairing_indicator(self, active: bool, duration_s: float = 120.0) -> None:
         with self._lock:
             self._pairing_until = (time.monotonic() + duration_s) if active else 0.0
+
+    def set_bluetooth_status(self, ready: bool, connected: bool) -> None:
+        with self._lock:
+            self._bt_ready = bool(ready)
+            self._bt_connected = bool(connected)
 
     def set_power(self, on: bool) -> None:
         with self._lock:
@@ -324,6 +332,8 @@ class LedEngine:
                 "available_shaders": self.shaders.names(),
                 "wall_epoch": self.wall_epoch(now),
                 "pairing": now < self._pairing_until,
+                "bt_ready": self._bt_ready,
+                "bt_connected": self._bt_connected,
             }
 
     def _render_calibration(self, now: float) -> list[RGB]:
@@ -346,7 +356,7 @@ class LedEngine:
                 frame[led_idx] = clamp_rgb(col[0] * scale, col[1] * scale, col[2] * scale)
         return frame
 
-    def _update_shim_led(self, pixels: list[RGB], now: float) -> None:
+    def _update_shim_led(self, now: float) -> None:
         if self.shim is None:
             return
         bri = self.config.shim_led_brightness
@@ -354,21 +364,30 @@ class LedEngine:
             self.shim.set_pixel(*self._flash_color, brightness=min(0.6, bri * 1.8))
             return
         if now < self._pairing_until:
-            pulse = 0.1 + 0.9 * (0.5 + 0.5 * math.sin(2.0 * math.pi * now * 2.5))
-            self.shim.set_pixel(0, 110, 255, brightness=bri * pulse * 1.5)
+            # Alternating blue and red flash while Bluetooth pairing is open
+            phase = int(now * 4.0) % 2
+            color = (0, 40, 255) if phase == 0 else (255, 0, 20)
+            self.shim.set_pixel(*color, brightness=min(0.7, bri * 1.8))
             return
-        if not self.state.power:
-            self.shim.set_pixel(0, 0, 0, brightness=0.0)
+        boot_elapsed = now - self._boot_start_mono
+        if 0.0 <= boot_elapsed < 3.0:
+            # Startup-ready pattern: 3 green blinks then steady green before showing BT status
+            if boot_elapsed < 2.4:
+                if (int(boot_elapsed / 0.4) % 2) == 0:
+                    self.shim.set_pixel(0, 255, 80, brightness=min(0.65, bri * 1.6))
+                else:
+                    self.shim.set_pixel(0, 0, 0, brightness=0.0)
+            else:
+                self.shim.set_pixel(0, 255, 80, brightness=min(0.65, bri * 1.4))
             return
-        if self.state.busy:
-            self.shim.set_pixel(255, 20, 0, brightness=bri)
+        if self._bt_connected:
+            self.shim.set_pixel(0, 90, 255, brightness=bri)
             return
-        # Mirror average color of active strip at subtle indicator brightness
-        if pixels:
-            r = sum(p[0] for p in pixels) // len(pixels)
-            g = sum(p[1] for p in pixels) // len(pixels)
-            b = sum(p[2] for p in pixels) // len(pixels)
-            self.shim.set_pixel(r, g, b, brightness=bri * 0.65)
+        if self._bt_ready:
+            breath = 0.15 + 0.50 * (0.5 + 0.5 * math.sin(2.0 * math.pi * now * 0.4))
+            self.shim.set_pixel(0, 60, 220, brightness=bri * breath)
+            return
+        self.shim.set_pixel(255, 110, 0, brightness=bri * 0.45)
 
     def render_tick(self, now: float | None = None) -> list[RGB]:
         """Compute one frame and push it to the strip + SHIM LED."""
@@ -409,7 +428,7 @@ class LedEngine:
                 pixels = shader_fn(mono - self._start_mono, self.seg_map, params)
 
             self.strip.show(pixels, brightness=brightness)
-            self._update_shim_led(pixels, mono)
+            self._update_shim_led(mono)
             return pixels
 
     def _run_loop(self) -> None:
@@ -427,6 +446,7 @@ class LedEngine:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
+        self._boot_start_mono = time.monotonic()
         self._stop_evt.clear()
         self._thread = threading.Thread(target=self._run_loop, name="led-engine", daemon=True)
         self._thread.start()

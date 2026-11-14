@@ -102,3 +102,44 @@ def test_keyframe_player_interpolation():
     mid = player.render(0.5)
     assert mid[0] == (100, 50, 0)
     assert mid[10] == (0, 0, 0)
+
+
+def test_shim_led_startup_pairing_and_bluetooth_status(monkeypatch):
+    cfg = DeviceConfig()
+    state = ModeState(active_mode="solid", mode_params={"color": "#FFFFFF"})
+    strip = MockStripDriver(num_leds=29, max_brightness_cap=cfg.max_brightness_cap)
+    shim = MockButtonShimDriver()
+
+    monkeypatch.setattr("cubelights_pi.engine.time.monotonic", lambda: 100.0)
+    engine = LedEngine(config=cfg, state=state, strip=strip, shim=shim)
+
+    # 1. Startup ready pattern (0..3.0s): green blinks then steady green
+    engine.render_tick(now=100.1)
+    assert shim.last_pixel[0] == (0, 255, 80)
+    engine.render_tick(now=100.5)
+    assert shim.last_pixel == ((0, 0, 0), 0.0)
+    engine.render_tick(now=102.6)
+    assert shim.last_pixel[0] == (0, 255, 80)
+
+    # 2. After startup: BT unavailable -> dim amber
+    engine.render_tick(now=104.0)
+    assert shim.last_pixel[0] == (255, 110, 0)
+
+    # 3. BT ready, disconnected -> breathing blue
+    engine.set_bluetooth_status(ready=True, connected=False)
+    engine.render_tick(now=104.0)
+    assert shim.last_pixel[0] == (0, 60, 220)
+
+    # 4. BT connected -> solid blue (even when strip power is off)
+    engine.set_bluetooth_status(ready=True, connected=True)
+    engine.set_power(False)
+    engine._flash_until = 0.0
+    engine.render_tick(now=104.5)
+    assert shim.last_pixel == ((0, 90, 255), cfg.shim_led_brightness)
+
+    # 5. Pairing mode -> alternating blue and red flash
+    engine.set_pairing_indicator(True, duration_s=120.0)
+    engine.render_tick(now=105.0)  # int(105.0 * 4) % 2 == 0 -> blue
+    assert shim.last_pixel[0] == (0, 40, 255)
+    engine.render_tick(now=105.25)  # int(105.25 * 4) % 2 == 1 -> red
+    assert shim.last_pixel[0] == (255, 0, 20)

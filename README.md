@@ -9,7 +9,7 @@ Bluetooth-controlled cubicle RGB LED lighting system built for a **Raspberry Pi 
   - `C`: Cycle brightness (`20% → 40% → 60% → 80% → 100%` of safety cap)
   - `D`: Previous mode
   - `E` (short press): Toggle lights On/Off
-  - `E` (hold 2s): Open 120s Bluetooth pairing window (SHIM LED pulses blue)
+  - `E` (hold 2s): Open 120s Bluetooth pairing window (SHIM LED flashes alternating blue/red)
   - `A + E` (hold 3s): Safe shutdown (`systemctl poweroff`)
 - **Hybrid Bluetooth Connectivity (No Office Wi-Fi Required)**:
   - **Bluetooth PAN (NAP)** (`10.55.0.1/24`) for native `ssh`, `scp`, and low-latency TCP/UDP LED control.

@@ -10,7 +10,7 @@ The Pi exposes three services over Bluetooth (paired & trusted, non-discoverable
 > [!IMPORTANT]
 > Pair your work laptop **while OverlayFS is disabled** (`cubelights-rw`), so the Bluetooth link keys in `/var/lib/bluetooth/` are permanently written to the SD card before re-enabling OverlayFS.
 
-1. On the Pi, **hold Button `E` for 2 seconds** (the Button SHIM LED pulses blue for 120 seconds).
+1. On the Pi, **hold Button `E` for 2 seconds** (the Button SHIM LED flashes alternating blue and red for 120 seconds).
 2. On Windows 11: **Settings -> Bluetooth & devices -> Add device -> Bluetooth**.
 3. Select **Cubelights** (or `cubelights`) and confirm pairing.
 4. Once paired, Windows automatically configures Bluetooth PAN and virtual Bluetooth COM ports.
