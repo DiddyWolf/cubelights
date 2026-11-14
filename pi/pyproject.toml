@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cubelights-pi"
+version = "0.1.0"
+description = "Raspberry Pi LED daemon, PiPixel APA102 driver, Button SHIM controller, and Bluetooth manager"
+requires-python = ">=3.11"
+dependencies = [
+    "cubelights-shared>=0.1.0",
+]
+
+[project.optional-dependencies]
+hardware = [
+    "spidev>=3.6",
+    "smbus2>=0.4.3",
+]
+
+[project.scripts]
+cubelights-daemon = "cubelights_pi.daemon:main"
+
+[tool.setuptools.packages.find]
+include = ["cubelights_pi*"]

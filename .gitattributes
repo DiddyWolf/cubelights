@@ -1,0 +1,8 @@
+* text=auto
+*.sh text eol=lf
+pi/system/cubelights-rw text eol=lf
+pi/system/cubelights-ro text eol=lf
+pi/system/*.conf text eol=lf
+pi/system/*.service text eol=lf
+pi/system/*.netdev text eol=lf
+pi/system/*.network text eol=lf

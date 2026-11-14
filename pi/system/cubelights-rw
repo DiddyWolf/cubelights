@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Temporarily disables OverlayFS (and optionally remounts /data rw) for OS/code updates.
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "Please run as root: sudo $0" >&2
+  exit 1
+fi
+
+echo "Disabling OverlayFS..."
+raspi-config nonint do_overlayfs 1
+echo "OverlayFS disabled. Reboot now so changes persist to the SD card:"
+echo "  sudo reboot"

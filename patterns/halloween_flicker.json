@@ -1,0 +1,25 @@
+{
+  "name": "halloween_flicker",
+  "description": "Spooky pumpkin orange and deep ultraviolet pulse",
+  "loop": 0,
+  "keyframes": [
+    {
+      "duration_ms": 900,
+      "easing": "ease_in_out",
+      "targets": [
+        {"zone": "strip_1", "color": "#FF5500"},
+        {"zone": "strip_2", "color": "#6400C8"},
+        {"zone": "strip_3", "color": "#FF5500"}
+      ]
+    },
+    {
+      "duration_ms": 750,
+      "easing": "ease_in_out",
+      "targets": [
+        {"zone": "strip_1", "color": "#5000A0"},
+        {"zone": "strip_2", "color": "#FF6A00"},
+        {"zone": "strip_3", "color": "#5000A0"}
+      ]
+    }
+  ]
+}

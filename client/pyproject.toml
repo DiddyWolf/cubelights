@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cubelights-client"
+version = "0.1.0"
+description = "Windows 11 SDK, CLI, system tray, and local Web UI for Cubelights"
+requires-python = ">=3.11"
+dependencies = [
+    "cubelights-shared>=0.1.0",
+    "pystray>=0.19.5",
+    "Pillow>=10.0.0",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+cubelights = "cubelights_client.cli:main"
+cubelights-tray = "cubelights_client.tray:main"
+
+[tool.setuptools.packages.find]
+include = ["cubelights_client*"]
+
+[tool.setuptools.package-data]
+cubelights_client = ["web/*.html"]

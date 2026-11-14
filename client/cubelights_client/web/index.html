@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cubelights Control</title>
+  <style>
+    :root {
+      --bg: #0f1218;
+      --card: #171c26;
+      --border: #262e3d;
+      --text: #e6ebf5;
+      --muted: #8b96ab;
+      --accent: #38bdf8;
+      --busy: #ef4444;
+      --ok: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--bg); color: var(--text); padding: 24px;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; display: grid; gap: 16px; }
+    header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    h1 { margin: 0; font-size: 1.4rem; }
+    .pill {
+      padding: 6px 12px; border-radius: 999px; font-size: 0.85rem;
+      background: var(--card); border: 1px solid var(--border); color: var(--muted);
+    }
+    .pill.online { color: var(--ok); border-color: #1e462d; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+    }
+    .card h2 { margin: 0 0 12px; font-size: 1rem; color: #cbd5e1; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button {
+      background: #232b3a; color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 14px; cursor: pointer; font-size: 0.9rem;
+    }
+    button:hover { border-color: var(--accent); }
+    button.active { background: #164e63; border-color: var(--accent); color: #fff; }
+    button.busy-on { background: #7f1d1d; border-color: var(--busy); color: #fff; }
+    input[type="range"] { accent-color: var(--accent); width: 220px; }
+    input[type="color"] { background: none; border: 1px solid var(--border); border-radius: 6px; width: 42px; height: 34px; cursor: pointer; }
+    select, textarea {
+      background: #0f131b; color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px; font-family: inherit;
+    }
+    .segments { display: grid; gap: 10px; }
+    .seg-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .seg-label { min-width: 90px; font-size: 0.85rem; color: var(--muted); }
+    .leds { display: flex; gap: 6px; flex-wrap: wrap; }
+    .led {
+      width: 24px; height: 24px; border-radius: 6px; border: 1px solid #334155;
+      cursor: pointer; font-size: 10px; display: grid; place-items: center; color: rgba(255,255,255,0.75);
+      background: #0b0e14;
+    }
+    textarea { width: 100%; min-height: 110px; font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Cubelights Control</h1>
+    <div id="connPill" class="pill">Connecting...</div>
+  </header>
+
+  <div class="card">
+    <h2>Quick Controls</h2>
+    <div class="row">
+      <button id="powerBtn" onclick="togglePower()">Power: --</button>
+      <button id="busyBtn" onclick="toggleBusy()">Busy / On-Call: OFF</button>
+      <label class="row">
+        <span>Brightness</span>
+        <input id="briSlider" type="range" min="0" max="100" value="65" oninput="debouncedBrightness(this.value)" />
+        <span id="briVal">65%</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Built-in Modes & Seasonal Themes</h2>
+    <div class="row" style="margin-bottom: 12px;">
+      <button onclick="setMode('rainbow', {speed: 0.05})">Rainbow</button>
+      <button onclick="setMode('wave', {speed: 0.18, colors: ['#002B7F','#0088FF','#00E5FF']})">Blue Waves</button>
+      <button onclick="setMode('warm_desk', {warmth: 0.85})">Warm Desk</button>
+      <button onclick="setMode('sparkle', {base: '#0A1833', spark: '#88CCFF'})">Sparkle</button>
+      <button onclick="setMode('chase', {color: '#00FFAA', speed: 0.35})">Chase</button>
+      <button onclick="setMode('pulse', {color: '#FF1800', speed: 0.35})">Pulse Red</button>
+    </div>
+    <div class="row">
+      <span>Seasonal:</span>
+      <select id="seasonSel">
+        <option value="auto">Auto (Synced Calendar)</option>
+        <option value="spring">Spring</option>
+        <option value="summer">Summer</option>
+        <option value="fall">Fall</option>
+        <option value="halloween">Halloween</option>
+        <option value="winter">Winter</option>
+        <option value="holiday">Holiday</option>
+        <option value="pride">Pride</option>
+      </select>
+      <button onclick="setMode('seasonal', {theme: document.getElementById('seasonSel').value, speed: 0.08})">Apply Seasonal</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Direct Segment & Per-LED Painter (29 LEDs)</h2>
+    <div class="row" style="margin-bottom: 12px;">
+      <label class="row">Brush Color <input id="paintColor" type="color" value="#38bdf8" /></label>
+      <button onclick="paintAll()">Fill All</button>
+      <button onclick="clearAll()">Clear All</button>
+    </div>
+    <div id="segmentsBox" class="segments"></div>
+  </div>
+
+  <div class="card">
+    <h2>Uploaded Declarative Patterns</h2>
+    <div id="patternsRow" class="row" style="margin-bottom: 12px;"></div>
+    <details>
+      <summary style="cursor:pointer; color: var(--muted);">Upload JSON Keyframe Pattern</summary>
+      <div style="margin-top:10px; display:grid; gap:8px;">
+        <textarea id="patternJson" placeholder='{"name":"my_pattern","loop":0,"keyframes":[{"duration_ms":1000,"easing":"ease_in_out","fill":"#0044ff"}]}'></textarea>
+        <div class="row">
+          <button onclick="uploadPattern()">Upload & Activate</button>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+  let state = null;
+  let briTimer = null;
+  const ledColors = Array(29).fill('#0b0e14');
+
+  async function apiCmd(cmd, payload = {}) {
+    const res = await fetch('/api/command', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({cmd, ...payload}),
+    });
+    const data = await res.json();
+    if (!data.ok) alert(data.error || 'Command failed');
+    await refresh();
+  }
+
+  async function refresh() {
+    const pill = document.getElementById('connPill');
+    try {
+      const res = await fetch('/api/status');
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      state = json;
+      pill.textContent = `Connected (${json.transport}) • ${json.status.active_mode}`;
+      pill.className = 'pill online';
+
+      const pBtn = document.getElementById('powerBtn');
+      pBtn.textContent = `Power: ${json.status.power ? 'ON' : 'OFF'}`;
+      pBtn.className = json.status.power ? 'active' : '';
+
+      const bBtn = document.getElementById('busyBtn');
+      bBtn.textContent = `Busy / On-Call: ${json.status.busy ? 'ON' : 'OFF'}`;
+      bBtn.className = json.status.busy ? 'busy-on' : '';
+
+      const pct = Math.round(json.status.brightness * 100);
+      document.getElementById('briSlider').value = pct;
+      document.getElementById('briVal').textContent = `${pct}%`;
+
+      renderSegments(json.config.segments || []);
+      renderPatterns(json.patterns || []);
+    } catch (e) {
+      pill.textContent = `Disconnected (${e.message})`;
+      pill.className = 'pill';
+    }
+  }
+
+  function renderSegments(segments) {
+    const box = document.getElementById('segmentsBox');
+    box.innerHTML = '';
+    let idx = 0;
+    segments.forEach(seg => {
+      const row = document.createElement('div');
+      row.className = 'seg-row';
+      const lbl = document.createElement('span');
+      lbl.className = 'seg-label';
+      lbl.textContent = `${seg.name} (${seg.length})`;
+      row.appendChild(lbl);
+
+      const zoneBtn = document.createElement('button');
+      zoneBtn.textContent = 'Paint Zone';
+      zoneBtn.onclick = () => paintZone(seg.name);
+      row.appendChild(zoneBtn);
+
+      const strip = document.createElement('div');
+      strip.className = 'leds';
+      for (let i = 0; i < seg.length; i++) {
+        const cur = idx++;
+        const dot = document.createElement('div');
+        dot.className = 'led';
+        dot.textContent = cur;
+        dot.style.background = ledColors[cur] || '#0b0e14';
+        dot.onclick = () => paintLed(cur);
+        strip.appendChild(dot);
+      }
+      row.appendChild(strip);
+      box.appendChild(row);
+    });
+  }
+
+  function renderPatterns(patterns) {
+    const row = document.getElementById('patternsRow');
+    row.innerHTML = '';
+    if (!patterns.length) {
+      row.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">No uploaded patterns yet.</span>';
+      return;
+    }
+    patterns.forEach(p => {
+      const b = document.createElement('button');
+      b.textContent = `▶ ${p.name}`;
+      b.onclick = () => setMode(`pattern:${p.name}`, {});
+      row.appendChild(b);
+    });
+  }
+
+  function togglePower() { apiCmd('set_power', {on: !(state && state.status.power)}); }
+  function toggleBusy() { apiCmd('set_busy', {enabled: !(state && state.status.busy)}); }
+  function setMode(name, params) { apiCmd('set_mode', {name, params}); }
+  function debouncedBrightness(val) {
+    document.getElementById('briVal').textContent = `${val}%`;
+    clearTimeout(briTimer);
+    briTimer = setTimeout(() => apiCmd('set_brightness', {level: Number(val) / 100}), 120);
+  }
+  function paintLed(index) {
+    const color = document.getElementById('paintColor').value;
+    ledColors[index] = color;
+    apiCmd('set_leds', {updates: [{index, color}]});
+  }
+  function paintZone(zone) {
+    const color = document.getElementById('paintColor').value;
+    apiCmd('set_leds', {updates: [{zone, color}]});
+  }
+  function paintAll() {
+    const color = document.getElementById('paintColor').value;
+    ledColors.fill(color);
+    apiCmd('set_leds', {colors: Array(29).fill(color)});
+  }
+  function clearAll() {
+    ledColors.fill('#0b0e14');
+    apiCmd('set_leds', {updates: [], clear_rest: true});
+  }
+  function uploadPattern() {
+    try {
+      const pattern = JSON.parse(document.getElementById('patternJson').value);
+      apiCmd('upload_pattern', {pattern, activate: true});
+    } catch (e) {
+      alert('Invalid JSON: ' + e.message);
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 5000);
+</script>
+</body>
+</html>

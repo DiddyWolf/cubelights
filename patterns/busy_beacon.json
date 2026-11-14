@@ -1,0 +1,21 @@
+{
+  "name": "busy_beacon",
+  "description": "Custom two-tone crimson/amber call-active pulse across zones",
+  "loop": 0,
+  "keyframes": [
+    {
+      "duration_ms": 1100,
+      "easing": "ease_in_out",
+      "fill": "#280000",
+      "targets": []
+    },
+    {
+      "duration_ms": 1100,
+      "easing": "ease_in_out",
+      "fill": "#FF1800",
+      "targets": [
+        {"zone": "strip_1", "color": "#FF3B00"}
+      ]
+    }
+  ]
+}

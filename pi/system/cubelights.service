@@ -1,0 +1,18 @@
+[Unit]
+Description=Cubelights LED Controller & Bluetooth Daemon
+After=bluetooth.target systemd-networkd.service local-fs.target
+Wants=bluetooth.target systemd-networkd.service
+
+[Service]
+Type=simple
+# Runs as root so BlueZ D-Bus ProfileManager1/NetworkServer1, agetty RFCOMM PTY,
+# and /data ro/rw remounting work reliably on this single-purpose appliance.
+User=root
+ExecStart=/opt/cubelights/venv/bin/cubelights-daemon --data-dir /data --remount-ro
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
