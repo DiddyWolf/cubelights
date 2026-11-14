@@ -27,15 +27,23 @@ This script safely updates the FAT32 `bootfs` partition before first boot:
 - **`user-data`**: Adds `growpart: { mode: off }` so Trixie's `cloud-init` also leaves the unallocated space free for Step 3.
 - **`config.txt`**: Ensures a trailing `[all]` section contains `enable_uart=1`, `dtparam=spi=on`, and `dtparam=i2c_arm=on` (so model filters like `[pi5]` never mask them).
 
-## Step 3: Boot, Copy Repo, and Run `setup_pi.sh`
+## Step 3: Boot, Get Repo onto the Pi, and Run `setup_pi.sh`
 1. Insert the SD card into the Pi Zero W, power on, and wait 2–4 minutes for first-boot `cloud-init` + Wi-Fi setup.
-2. From the repo root directory on your Windows PC, bundle `main` and copy it to the Pi over SSH (writing a bundle file avoids Windows PowerShell 5.1 corrupting binary piped streams; replace `cubelights.local` with the Pi's IP if mDNS does not resolve):
-   ```powershell
-   git bundle create $env:TEMP\cubelights.bundle main
-   scp $env:TEMP\cubelights.bundle pi@cubelights.local:~/
-   ssh pi@cubelights.local "rm -rf ~/cubelights && git clone ~/cubelights.bundle ~/cubelights && rm ~/cubelights.bundle"
-   ```
-3. SSH into the Pi (`ssh pi@cubelights.local`) and run `setup_pi.sh`:
+2. Get the repository onto the Pi (replace `cubelights.local` with the Pi's IP if mDNS does not resolve):
+   - **Option A — Clone directly from GitHub (recommended):**
+     SSH into the Pi (`ssh pi@cubelights.local`) and run:
+     ```bash
+     command -v git >/dev/null || (sudo apt-get update && sudo apt-get install -y git)
+     git clone https://github.com/DiddyWolf/cubelights.git ~/cubelights
+     ```
+   - **Option B — Copy local unpushed/local commits from Windows PC:**
+     From the repo root directory on your Windows PC, archive `main` to a `.tar.gz` file and `scp` it (writing a file avoids Windows PowerShell 5.1 corrupting binary piped streams, and requires no `git` on the Pi):
+     ```powershell
+     git archive --format=tar.gz -o $env:TEMP\cubelights.tar.gz main
+     scp $env:TEMP\cubelights.tar.gz pi@cubelights.local:~/
+     ssh pi@cubelights.local "mkdir -p ~/cubelights && tar -xzf ~/cubelights.tar.gz -C ~/cubelights && rm ~/cubelights.tar.gz"
+     ```
+3. On the Pi, run `setup_pi.sh` from `~/cubelights`:
    ```bash
    cd ~/cubelights
    sudo ./pi/system/setup_pi.sh
