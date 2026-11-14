@@ -1,7 +1,7 @@
 [Unit]
 Description=Cubelights LED Controller & Bluetooth Daemon
-After=bluetooth.target systemd-networkd.service local-fs.target
-Wants=bluetooth.target systemd-networkd.service
+After=bluetooth.target cubelights-pan0.service local-fs.target
+Wants=bluetooth.target cubelights-pan0.service
 
 [Service]
 Type=simple

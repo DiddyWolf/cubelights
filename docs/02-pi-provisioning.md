@@ -14,64 +14,47 @@ Perform these steps on your **personal computer at home** where the Pi can reach
    - Services: **Enable SSH** (add your SSH public key if desired)
 5. Write the image to your microSD card (8 GB or larger recommended).
 
-## Step 2: Create the Dedicated `/data` Partition (Recommended Before OverlayFS)
-To keep user presets, uploaded patterns, and state persistent across reboots while `/` is locked read-only by OverlayFS, give `/data` its own small partition (`mmcblk0p3`, ~512 MB) on the SD card.
+## Step 2: Prepare `bootfs` on Windows Before First Boot
+Right after Raspberry Pi Imager finishes (re-insert the SD card reader if Windows auto-ejected it), run [prepare_bootfs.ps1](file:///c:/Users/DiddyWolf/Projects/cubelights/pi/system/prepare_bootfs.ps1) in PowerShell on your Windows PC:
 
-### Option A: Pre-create the Partition on Windows Before First Boot (Recommended)
-Right after Raspberry Pi Imager finishes, the SD card has `bootfs` (512 MB), `rootfs` (~2.1 GB), and unallocated space.
-On Raspberry Pi OS **Trixie**, `cmdline.txt` on `bootfs` includes the `resize` flag, which normally expands `rootfs` to fill the whole card—**unless** a 3rd partition already exists (in which case the `raspberrypi-sys-mods` resize hook sees `rootfs` is not the last partition and skips expanding it).
-
-To reserve room for `rootfs` (~8 GB total) **and** place `/data` right after it using Windows Disk Management:
-1. Open **Disk Management** (`diskmgmt.msc`) on Windows.
-2. Right-click the **Unallocated** space -> **New Simple Volume**:
-   - Size: `6144` MB (6 GB temporary spacer so `rootfs` has room to grow to ~8 GB)
-   - Drive letter: **Do not assign a drive letter**
-   - Format: **Do not format this volume**
-3. Right-click the remaining **Unallocated** space -> **New Simple Volume**:
-   - Size: `512` MB (this will become `mmcblk0p3` for `/data`)
-   - Drive letter: **Do not assign a drive letter**
-   - Format: **Do not format this volume**
-4. Right-click the **6 GB spacer volume** you created in step 2 -> **Delete Volume** (leaving a 6 GB unallocated gap between `rootfs` and `mmcblk0p3`).
-   *(Tip: If Disk Management disables "New Simple Volume" on your card reader, use `diskpart`: `select disk N`, `create partition primary size=512 offset=8704000` or create/delete the 6144 MB spacer via `create partition primary size=6144` -> `create partition primary size=512` -> `select partition 3` -> `delete partition`.)*
-5. *(Optional)* To prevent any surprise automatic resize during boot, open `bootfs\cmdline.txt` and remove the `resize` token (keep the file on a single line).
-
-### Option B: Boot the Pi, Expand `rootfs` into the Gap, and Format `/data`
-1. Boot the Pi and SSH in (`ssh pi@cubelights.local`).
-2. Check your disk layout (`lsblk` and `df -h /`).
-3. If `mmcblk0p2` is still ~2.1 GB (because `resize` skipped it when `mmcblk0p3` existed), expand `mmcblk0p2` into the 6 GB unallocated gap before `mmcblk0p3`:
-   ```bash
-   sudo parted /dev/mmcblk0 unit s print free
-   # Note the "End" sector of the "Free Space" block right before partition 3, then run:
-   sudo parted /dev/mmcblk0 resizepart 2 <END_SECTOR>s
-   sudo resize2fs /dev/mmcblk0p2
-   ```
-   *(If you skipped Option A and let first boot expand `mmcblk0p2` across the entire card, you can shrink `mmcblk0p2` offline with GParted on Linux to make room for `mmcblk0p3`.)*
-4. Format and mount `mmcblk0p3` at `/data` (mounted read-only by default):
-   ```bash
-   sudo mkfs.ext4 -L cubelights-data /dev/mmcblk0p3
-   sudo mkdir -p /data
-   echo 'LABEL=cubelights-data /data ext4 ro,noatime,nofail 0 2' | sudo tee -a /etc/fstab
-   sudo mount /data
-   sudo mount -o remount,rw /data
-   ```
-
-> [!NOTE]
-> If `/data` is not a separate partition, `cubelights-daemon` still works, but once OverlayFS is enabled, any pattern uploads or mode changes saved to `/data` will stay in RAM and reset on reboot.
-
-## Step 3: Copy Repo & Run `setup_pi.sh`
-From your home PC, copy the `cubelights` repository to the Pi (e.g. via `scp` or `git clone`), then run:
-
-```bash
-cd ~/cubelights
-sudo ./pi/system/setup_pi.sh
+```powershell
+.\pi\system\prepare_bootfs.ps1
 ```
+*(You can pass `-BootDrive D` if auto-detection asks for a drive letter.)*
 
-What `setup_pi.sh` installs and configures:
-- APT packages: `python3-venv`, `python3-dbus`, `python3-gi`, `python3-spidev`, `python3-smbus`, `bluez`, `dnsmasq`, `parted`, `util-linux`.
-- Enables SPI (`dtparam=spi=on`) and I2C (`dtparam=i2c_arm=on`, `i2c-dev`) in `/boot/firmware/config.txt`.
-- Installs `cubelights-shared` and `cubelights-pi` into `/opt/cubelights/venv` (with `--system-site-packages` to avoid ARMv6 wheel builds).
-- Configures `pan0` bridge (`10.55.0.1/24` via `systemd-networkd` + `dnsmasq` scoped strictly to `pan0`), marks `pan0` unmanaged in NetworkManager, and updates `/etc/bluetooth/main.conf`.
-- Installs `cubelights.service` and helper scripts (`cubelights-rw`, `cubelights-ro`, `cubelights-enable-ro`, `cubelights-prepare-image`).
+This script safely updates the FAT32 `bootfs` partition before first boot:
+- **`cmdline.txt`**: Removes `resize` (so the Pi does not expand root across the whole SD card) and ensures `console=serial0,115200` is present for PiUART serial console access.
+- **`user-data`**: Adds `growpart: { mode: off }` so Trixie's `cloud-init` also leaves the unallocated space free for Step 3.
+- **`config.txt`**: Ensures a trailing `[all]` section contains `enable_uart=1`, `dtparam=spi=on`, and `dtparam=i2c_arm=on` (so model filters like `[pi5]` never mask them).
+
+## Step 3: Boot, Copy Repo, and Run `setup_pi.sh`
+1. Insert the SD card into the Pi Zero W, power on, and wait 2–4 minutes for first-boot `cloud-init` + Wi-Fi setup.
+2. Stream the clean repo from your Windows PC to the Pi over SSH:
+   ```powershell
+   git -C c:\Users\DiddyWolf\Projects\cubelights archive --format=tar main | ssh pi@cubelights.local "mkdir -p ~/cubelights && tar -xf - -C ~/cubelights"
+   ```
+3. SSH into the Pi (`ssh pi@cubelights.local`) and run `setup_pi.sh`:
+   ```bash
+   cd ~/cubelights
+   sudo ./pi/system/setup_pi.sh
+   ```
+
+What `setup_pi.sh` does automatically:
+- **Storage partitions:** Online-resizes `rootfs` (`/dev/mmcblk0p2`) to `8192 MiB` (override via `ROOT_SIZE_MIB`), creates a `512 MiB` `/dev/mmcblk0p3` partition (`DATA_SIZE_MIB`), formats it as `ext4` (`LABEL=cubelights-data`), adds it to `/etc/fstab` as `ro,noatime,nofail`, and populates `/data/patterns/` before remounting `/data` `ro`.
+- **APT packages:** Installs `python3-venv`, `python3-pip`, `python3-setuptools`, `python3-wheel`, `python3-dbus`, `python3-gi`, `python3-spidev`, `python3-smbus`, `i2c-tools`, `bluez`, `dnsmasq`, `parted`, `util-linux`.
+- **SPI & I2C:** Calls `raspi-config nonint do_spi 0` and `do_i2c 0`, and enables `i2c-dev`.
+- **Python venv:** Installs `cubelights-shared` and `cubelights-pi` into `/opt/cubelights/venv` (`--system-site-packages` to avoid ARMv6 wheel builds).
+- **Bluetooth PAN & Services:** Configures `pan0` bridge (`10.55.0.1/24` via `cubelights-pan0.service` + DHCP-only `dnsmasq` with `port=0`), marks `pan0` unmanaged in NetworkManager (leaving `wlan0` undisturbed), and updates `/etc/bluetooth/main.conf`.
+  - *(Avoid corporate `10.x.x.x` collisions)* You can override the `/24` subnet prefix at install time (for example, `172.31.250.0/24` or `192.168.254.0/24`):
+    ```bash
+    sudo PAN_SUBNET_PREFIX=172.31.250 ./pi/system/setup_pi.sh
+    ```
+    To change it **after** setup (run `sudo cubelights-rw && sudo reboot` first if OverlayFS is already enabled):
+    1. Edit `/etc/systemd/system/cubelights-pan0.service` (`172.31.250.1/24`)
+    2. Edit `/etc/dnsmasq.d/cubelights-pan0.conf` (`dhcp-range=172.31.250.10,172.31.250.50,255.255.255.0,12h`)
+    3. Reload and restart: `sudo systemctl daemon-reload && sudo systemctl restart cubelights-pan0 dnsmasq`
+    4. Save the new IP on your Windows laptop: `cubelights discover --save-host 172.31.250.1`
+- **Systemd & Helpers:** Installs `cubelights.service` and helper scripts (`cubelights-rw`, `cubelights-ro`, `cubelights-enable-ro`, `cubelights-prepare-image`).
 
 Reboot once after running `setup_pi.sh` so SPI and I2C kernel modules are active:
 

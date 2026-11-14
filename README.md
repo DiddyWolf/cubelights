@@ -33,10 +33,11 @@ cubelights/
 ├── README.md                    # Project overview
 ├── docs/
 │   ├── 01-hardware-assembly.md  # Pi Zero W, PiPixel SPI_DAT, Button SHIM, 6+13+10 wiring
-│   ├── 02-pi-provisioning.md    # 32-bit Bookworm setup, /data partition, calibration, OverlayFS
+│   ├── 02-pi-provisioning.md    # 32-bit Trixie/Bookworm, prepare_bootfs.ps1, setup_pi.sh, OverlayFS
 │   ├── 03-bluetooth-and-windows.md # Pairing, PAN SSH, RFCOMM console, Windows CLI/Tray/Web UI
 │   ├── 04-maintenance-and-backups.md # OverlayFS updates, /data edits, Golden SD backups, PiUART recovery
-│   └── 05-patterns-and-protocol.md   # Wire protocol, JSON keyframes, custom shaders & SDK streaming
+│   ├── 05-patterns-and-protocol.md   # Wire protocol, JSON keyframes, custom shaders & SDK streaming
+│   └── 06-testing-and-troubleshooting.md # Boot/PiUART/HAT triage, BT E2E, OverlayFS power-cut tests
 ├── shared/                      # cubelights-shared (protocol, segments, patterns)
 ├── pi/                          # cubelights-pi (daemon, APA102 SPI, Button SHIM I2C, BlueZ, system/)
 ├── client/                      # cubelights-client (Windows 11 SDK, CLI, Tray, Web UI)

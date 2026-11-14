@@ -33,8 +33,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = p.add_subparsers(dest="command", required=True)
 
-    disc = sub.add_parser("discover", help="Find paired Bluetooth Cubelights devices on Windows and optionally save MAC")
+    disc = sub.add_parser("discover", help="Find paired Bluetooth Cubelights devices on Windows and optionally save MAC/host")
     disc.add_argument("--save-mac", default=None, help="Save Bluetooth MAC to client config")
+    disc.add_argument("--save-host", default=None, help="Save custom PAN IP to client config (default 10.55.0.1)")
 
     sub.add_parser("status", help="Show Pi LED engine status")
 
@@ -95,11 +96,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "discover":
-        if args.save_mac:
+        if args.save_mac or args.save_host:
             cfg = ClientConfig.load()
-            cfg.bt_mac = format_bt_mac(args.save_mac)
+            if args.save_mac:
+                cfg.bt_mac = format_bt_mac(args.save_mac)
+            if args.save_host:
+                cfg.pan_ip = str(args.save_host).strip()
             saved = cfg.save()
-            print(f"Saved bt_mac={cfg.bt_mac} to {saved}")
+            print(f"Saved bt_mac={cfg.bt_mac}, pan_ip={cfg.pan_ip} to {saved}")
             return 0
         devices = discover_paired_pis()
         if not devices:

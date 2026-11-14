@@ -1,0 +1,15 @@
+[Unit]
+Description=Create Bluetooth PAN bridge interface (pan0)
+Before=dnsmasq.service cubelights.service
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/sbin/ip link add name pan0 type bridge
+ExecStart=-/sbin/ip addr replace 10.55.0.1/24 dev pan0
+ExecStart=/sbin/ip link set pan0 up
+ExecStop=/sbin/ip link del pan0
+
+[Install]
+WantedBy=multi-user.target
