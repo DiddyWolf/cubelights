@@ -50,7 +50,7 @@ This script safely updates the FAT32 `bootfs` partition before first boot:
    ```
 
 What `setup_pi.sh` does automatically:
-- **Storage partitions:** Online-resizes `rootfs` (`/dev/mmcblk0p2`) to `8192 MiB` (override via `ROOT_SIZE_MIB`), creates a `512 MiB` `/dev/mmcblk0p3` partition (`DATA_SIZE_MIB`), formats it as `ext4` (`LABEL=cubelights-data`), adds it to `/etc/fstab` as `ro,noatime,nofail`, and populates `/data/patterns/` before remounting `/data` `ro`.
+- **Storage partitions:** Online-resizes `rootfs` (`/dev/mmcblk0p2`) to `8192 MiB` (override via `ROOT_SIZE_MIB`), creates a `512 MiB` `/dev/mmcblk0p3` partition (`DATA_SIZE_MIB`), formats it as `ext4` (`LABEL=cubelights-data`), installs and enables systemd `data.mount` (`ro,noatime`, kept out of `/etc/fstab` so `overlayroot` leaves `/data` persistent on disk), and populates `/data/patterns/` before remounting `/data` `ro`.
 - **APT packages:** Installs `python3-venv`, `python3-pip`, `python3-setuptools`, `python3-wheel`, `python3-dbus`, `python3-gi`, `python3-spidev`, `python3-smbus`, `i2c-tools`, `bluez`, `dnsmasq`, `parted`, `util-linux`.
 - **SPI & I2C:** Calls `raspi-config nonint do_spi 0` and `do_i2c 0`, and enables `i2c-dev`.
 - **Python venv:** Installs `cubelights-shared` and `cubelights-pi` into `/opt/cubelights/venv` (`--system-site-packages` to avoid ARMv6 wheel builds).

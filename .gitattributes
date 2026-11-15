@@ -6,3 +6,4 @@ pi/system/*.conf text eol=lf
 pi/system/*.service text eol=lf
 pi/system/*.netdev text eol=lf
 pi/system/*.network text eol=lf
+pi/system/*.mount text eol=lf

@@ -78,12 +78,16 @@ setup_storage_partitions() {
       fi
     fi
     mkdir -p /data
-    if ! grep -q '^LABEL=cubelights-data[[:space:]]\+/data[[:space:]]' /etc/fstab; then
-      echo 'LABEL=cubelights-data /data ext4 ro,noatime,nofail 0 2' >> /etc/fstab
+    # Keep /data out of /etc/fstab so overlayroot does not wrap /data in a RAM overlay;
+    # mount it directly via systemd data.mount as ext4 (ro,noatime).
+    if grep -q '^LABEL=cubelights-data[[:space:]]\+/data[[:space:]]' /etc/fstab; then
+      sed -i '\|^LABEL=cubelights-data[[:space:]]\+/data[[:space:]]|d' /etc/fstab
     fi
+    cp "${SYS_DIR}/data.mount" /etc/systemd/system/data.mount
+    systemctl daemon-reload
+    systemctl enable data.mount
     if ! mountpoint -q /data; then
-      systemctl daemon-reload >/dev/null 2>&1 || true
-      mount /data || mount "${p3_dev}" /data
+      systemctl start data.mount || mount "${p3_dev}" /data
     fi
     mount -o remount,rw /data
   fi

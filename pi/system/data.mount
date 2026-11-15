@@ -1,0 +1,15 @@
+[Unit]
+Description=Cubelights persistent /data partition
+DefaultDependencies=no
+Conflicts=umount.target
+Before=local-fs.target umount.target cubelights.service
+After=local-fs-pre.target systemd-udevd.service
+
+[Mount]
+What=/dev/disk/by-label/cubelights-data
+Where=/data
+Type=ext4
+Options=ro,noatime
+
+[Install]
+WantedBy=local-fs.target
